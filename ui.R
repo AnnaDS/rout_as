@@ -1,5 +1,5 @@
-library(shiny)
-
+require(shiny)
+require(shinyIncubator)
 # Define UI for dataset viewer application
 shinyUI(fluidPage(
   

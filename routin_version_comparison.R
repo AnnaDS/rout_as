@@ -225,6 +225,69 @@ for( i in 1:length(numC)){
   return(RN)
 }
 
+
+getDBF_id <- function (version1=vvn, init=FALSE,  env="prod", id=""){
+  all_cons <- dbListConnections(MySQL())
+  for(con in all_cons) {
+    if (length(dbListResults(con))>0)
+      dbClearResult(dbListResults(con)[[1]])
+    dbDisconnect(con)}
+  params=data.frame(V1=c("id_rgt","original_run_id","routing_run_id","routing_version","routing_plan_name",
+                         #"routing_plan_name",
+                         #"routing_work_time_human",
+                         #"routing_work_time_machine","input_file","output_file",
+                         "sum_travel_time","sum_waiting_time","sum_overdue_time","sum_overtime_soft", "sum_overtime_hard",
+                         "company","sum_work_time","sum_not_assigned", "sum_sla_violation", "raw_waiting_time_sum", "raw_work_time_sum",
+                         "raw_travel_time_sum","raw_final_travel_time_sum","raw_overdue_time_sum", "raw_sla_violation_sum",
+                         "raw_overtime_soft_sum","raw_overtime_hard_sum",
+                         "raw_not_assigned_activities", "raw_not_assigned_activities_unacceptable_travel_time",
+                         "raw_not_assigned_activities_provider_workday_stop", "raw_not_assigned_activities_provider_overload",
+                         "raw_total_activities","raw_assigned_activities","raw_rejected_activities", "sum_would_be_not_assigned",
+                         "fitness","providers_used","info_sum_assigned"))
+  
+  sqll='Select '
+  h=seq(1,nrow(params))
+  for (i in h){
+    #print(params[i,1])
+    if(sqll=='Select ') sqll=paste(sqll, 'V.`', as.character(params[i,1]),"`  as  stage_", as.character(params[i,1]), sep='')    
+    else if(as.character(params[i,1])=="company"|
+              as.character(params[i,1])=="original_run_id"|
+              as.character(params[i,1])=="id_rgt" |
+              as.character(params[i,1])=="routing_plan_name" |
+              as.character(params[i,1])=="routing_version")
+      sqll=paste(sqll, ", ", 'V.`', as.character(params[i,1]),"`  as  stage_", as.character(params[i,1]), sep='')    
+    else 
+    {
+      sqll=paste(sqll, ", ", 'V.`', as.character(params[i,1]),"`  as  stage_", as.character(params[i,1]), sep='')    
+    }
+  }
+  #   if(length(dates)>0)
+  #     sqll=paste(sqll, ' FROM `rgt.cp` V WHERE V.`routing_version` like \'', version1,"\' and V.company  like \"", cmp , "\" and V.run_time>= \'",dates[1]," 00:00:00\' and V.run_time<= \'",dates[2]," 00:00:00\' and V.run_type like \'",env,"\'",  sep='' )
+  #   else 
+  #     sqll=paste(sqll, ' FROM `rgt.cp` V WHERE V.`routing_version` like \'', version1,"\' and V.company  like \"", cmp , "\" ",  sep='' )
+  #   
+    sqll=paste(sqll, ' FROM `rgt` V WHERE V.`routing_version` like \'', version1,"\' and V.id_rgt = \'",id,"\'",  sep='' )
+  
+  print(paste('Hello New',sqll))
+  # con <- dbConnect(MySQL(), user="sla1", password="sla1SLA!", dbname="anna_rhs", host="slasrv2.ua1")
+  #con <- dbConnect(MySQL(), user="sla1", password="sla1SLA!", dbname="anna_rhs1", host="slasrv2.ua1")
+  con2 <- dbConnect(MySQL(), user="rhsuser", password="hwDQL45m6jqHXXYB", dbname="rhs", host="ed1rhs01.etadirect.com")
+  RN=dbGetQuery(con2,paste(sqll))
+  numC=c("id_rgt","original_run_id","routing_run_id",
+         "sum_travel_time","sum_waiting_time","sum_overdue_time","sum_work_time","sum_not_assigned", "sum_sla_violation", "raw_waiting_time_sum", "raw_work_time_sum",
+         "raw_travel_time_sum","raw_overtime_soft_sum","raw_overtime_hard_sum","raw_not_assigned_activities","raw_total_activities",
+         "fitness","providers_used","info_sum_assigned")
+  for( i in 1:length(numC)){
+    RN[,grep(numC[i],colnames(RN))]=as.numeric(as.character(RN[,grep(numC[i],colnames(RN))]))
+  }
+  if(init) colnames(RN)[grep("stage_",colnames(RN))]=paste(gsub("stage_", "initial_",colnames(RN)[grep("stage_",colnames(RN))]),version1, sep='')
+  else
+    colnames(RN)[grep("stage_",colnames(RN))]=paste(colnames(RN)[grep("stage_",colnames(RN))],version1, sep='')
+  #print (head(RN))
+  return(RN)
+}
+
+
 getDBwt <- function (version1=vvn,  init=FALSE, cmp="", dates="", env){
   all_cons <- dbListConnections(MySQL())
   for(con in all_cons) {
@@ -389,7 +452,7 @@ if(rp!=''){
   #print(head(RA11))
   RA22=getRelAs(t, (as.numeric(t[,grep("_raw_total_activities",colnames(t))])), fin=FALSE, v=v)
   #print(head(RA22))
-  colN=NULL
+  colN=1
   for(l in 1:length(orig_vec))
     colN=c(colN, grep(orig_vec[l],colnames(RA11)))
  
@@ -399,13 +462,16 @@ if(rp!=''){
  ra1c=NULL
  ra2c=NULL
   for(l in 1:nrow(RA11)) {#print(RA1[l,])
-    ra1c=c(ra1c,calc.v(RA11[l,], idr, orig_vec ))
+    print(paste("Area",l))
+    ra1c=rbind(ra1c, data.frame(id_rgt=RA11[l,1], val=calc.v(RA11[l,seq(2, ncol(RA11))], idr, orig_vec )))
     if(l==1) {plot(idr, t='l', lwd=3, col='red', main=rp)}
-    lines(as.numeric(RA11[l,]), col='blue')}
+    lines(as.numeric(RA11[l,seq(2, ncol(RA11))]), col='blue')}
   
   for(l in 1:nrow(RA22)) {#print(RA1[l,])
-    ra2c=c(ra2c,calc.v(RA22[l,], idr, orig_vec ))
-    lines(as.numeric(RA22[l,]), col='green')}
+    print(paste("Area",l))
+    ra2c=rbind(ra2c, data.frame(id_rgt=RA22[l,1], val=calc.v(RA22[l,seq(2, ncol(RA22))], idr, orig_vec )))
+    #ra2c=c(ra2c,calc.v(RA22[l,seq(2, ncol(RA11))], idr, orig_vec ))
+    lines(as.numeric(RA22[l,seq(2, ncol(RA11))]), col='green')}
   
   #print(head(RA1))
   #print(head(RA2))
@@ -419,8 +485,16 @@ if(rp!=''){
     ra11=cbind(ra11,RA1[,c(grep(vec_RP[h], colnames(RA1)))])
     ra22=cbind(ra22,RA2[,c(grep(vec_RP[h], colnames(RA2)))])
   }
-  ra11=cbind(ra11, ra1c)
-  ra22=cbind(ra22, ra2c)
+  #ra11=cbind(ra11, ra1c)
+  #ra22=cbind(ra22, ra2c)
+ colnames(ra11)[1]=vec_RP[1]
+ colnames(ra22)[1]=vec_RP[1]
+ print(class(ra11))
+ print(class(ra22))
+ ra11=merge(ra11, ra1c, by=intersect(names(ra11), names(ra1c)) )
+ ra22=merge(ra22, ra2c, by=intersect(names(ra22), names(ra2c)) )
+ 
+ 
   RA1=ra11
   RA2=ra22
  print(head(RA1))
@@ -672,7 +746,8 @@ for(i in 1:length(F)) {ss=sum(ss, ((F[i]-idr[i])^2))
 #return(ss)
 # return((1-ss/tss))
 #return(cc*1/abs(S1-S2))
-return(1-abs(S1-S2))
+print(paste(S1, S2))
+return(1-abs(S1-S2)/S1)
 }
 calc.area <- function(idr){
   ss=0

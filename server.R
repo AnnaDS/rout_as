@@ -260,7 +260,7 @@ output$choose_dataset1 <- renderUI({
   if (input$goButton==FALSE)  
     selectInput("rout_plan", "Select Routing plan","", selected="")
   else {
-      x <-x();
+   x <-x()
     print(x)
     x=as.data.frame(x)
     rp=as.character(x[,1])
